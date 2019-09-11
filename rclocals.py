@@ -375,7 +375,7 @@ WalkAndTest(profiledir, True)
 
 WalkAndTest(skeldir, True)			
 
-print(Back.RESET + Fore.CYAN + "\tTesting if /home's rc files are equal than skel dir")
+print(Back.RESET + Fore.YELLOW + "\tTesting if /home's rc files are equal than skel dir")
 
 listOfFile = os.listdir("/home/")
 allFiles = list()
