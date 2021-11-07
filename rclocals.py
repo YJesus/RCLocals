@@ -7,6 +7,17 @@ import re
 import subprocess
 import filecmp
 import re
+import argparse
+from os import walk
+
+
+
+ap = argparse.ArgumentParser()
+
+ap.add_argument('--triage', dest='triage', action='store_true')
+ap.add_argument("--all", dest='allinfo', action='store_true')
+
+args = ap.parse_args()
 
 debian = '/etc/debian_version'
 redhat = '/etc/redhat-release'
@@ -21,12 +32,14 @@ def TestIntegrity(File):
 		outputrpm = processrpm.communicate()[0]
 					
 		if outputrpm :
-						
+			
+			print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % File)			
 			print(Back.RESET + Fore.RED + "Integrity compromised\n")
 								
 		
-		else:
+		if not outputrpm and args.allinfo:
 			
+			print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % File)
 			print(Back.RESET + Fore.GREEN + "Integrity OK\n")
 
 	else :	
@@ -54,7 +67,8 @@ def TestIntegrity(File):
 			outputdpkg = outputdpkg2
 							
 			if processdpkg2.returncode == 1:
-							
+				
+				print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % File)			
 				print(Back.RESET + Fore.RED + "Integrity compromised\n")
 				return(0)
 								
@@ -67,13 +81,16 @@ def TestIntegrity(File):
 		processdebsum = subprocess.Popen([commandDEBSUM], stdout=subprocess.PIPE,shell=True)
 		outputdebsum = processdebsum.communicate()[0]
 		
-		print outputdebsum
+		print (outputdebsum)
 						
 		if outputdebsum :
 			
+			print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % File)
 			print(Back.RESET + Fore.RED + "Integrity compromised\n")
 						
-		else:
+		if not outputdebsum and args.allinfo:
+			
+			print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % File)
 			print(Back.RESET + Fore.GREEN + "Integrity OK\n")
 						
 		
@@ -89,9 +106,7 @@ def OpenAndPrint(File) :
 		print(Back.RESET + Fore.GREEN + "%s" % lines)
 	
 
-def WalkAndTest(Dir, Int=False):
-	
-	print(Back.RESET + Fore.CYAN + "\t%s content: \n" % Dir)
+def WalkAndTest(Dir, Int=False, Print=False):
 	
 	filesdir = []
 	
@@ -106,17 +121,12 @@ def WalkAndTest(Dir, Int=False):
 			
 			if os.path.isfile(filereal): 
 		
-				print(Back.RESET + Fore.CYAN + "%s: \n" % filereal)
-		
-				filedir= open(filereal, "r")
-		
-				for lines in filedir.readlines():
-
-					print(Back.RESET + Fore.GREEN + "%s" % lines)
+				if Print:
+					
+					OpenAndPrint(filereal)	
 
 				if Int:
-					print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % f)
-			
+					
 					TestIntegrity(filereal)
 
 
@@ -126,14 +136,15 @@ def CompareRC(File, DestFile):
 	
 		if not filecmp.cmp(File, DestFile):
 				
-			print "Changes detected in %s\n" % File
+			print(Back.RESET + Fore.RED + "%s Integrity compromised\n" % File)
 		
-			OpenAndPrint(File)
+			if args.allinfo :
+				OpenAndPrint(File)
 		
 	
 
-print(Back.RESET + Fore.GREEN + "RcLocals 1.0")
-print(Back.RESET + Fore.GREEN + "www.security-projects.com/?RcLocals\n")
+print(Back.RESET + Fore.GREEN + "RcLocals 2.0")
+print(Back.RESET + Fore.GREEN + "https://github.com/YJesus/RCLocals\n")
 		
 
 print(Back.RESET + Fore.YELLOW + "[*Listing GPG keys*]\n")
@@ -168,7 +179,7 @@ if os.path.exists(debian) :
 	
 else:
 	
-	commandRPMPACK = r'rpm -qa --qf "%{name}-%{version}-%{release}.%{arch} %|DSAHEADER?{%{DSAHEADER:pgpsig}}:{%|RSAHEADER?{%{RSAHEADER:pgpsig}}:{%|SIGGPG?{%{SIGGPG:pgpsig}}:{%|SIGPGP?{%{SIGPGP:pgpsig}}:{(none)}|}|}|}|\n"'
+	commandRPMPACK = r'rpm -qa --qf "%{INSTALLTIME:date} %{name}-%{version}-%{release}.%{arch} %|DSAHEADER?{%{DSAHEADER:pgpsig}}:{%|RSAHEADER?{%{RSAHEADER:pgpsig}}:{%|SIGGPG?{%{SIGGPG:pgpsig}}:{%|SIGPGP?{%{SIGPGP:pgpsig}}:{(none)}|}|}|}|\n"'
 									
 	processrpmpack = subprocess.Popen([commandRPMPACK], stdout=subprocess.PIPE,shell=True)
 	outputrpmpack = processrpmpack.communicate()[0]
@@ -208,14 +219,28 @@ for processPid in os.listdir("/proc"):
 
 		for libs in file.readlines():
 			
-			match = re.search(r'\s[\w-][\w-]([\w-])[\w-].*\s\s\s\s*([\w\/].*)' , libs)
-			
-			if  match and match.group(1) == 'x':
-	
+			match = re.search(r'.*\d\s(.{4})\s\d.*\s*\s(\/.*)' , libs)
+            
+			if match:
+                
+				matchexe = re.search(r'.*x.*', match.group(1))
+				matchrwx = re.search(r'rwx.*', match.group(1))
+                
+			if  match and matchrwx:
+                
+				print(Back.RESET + Fore.RED + "Suspicious memory region in process %s in PID %s" % (match.group(2), processPid))
+								
+				exefile = '/proc/'+processPid+'/exe'
+				exepath = os.path.realpath(exefile)
+				print(Fore.RED + "Exefile %s\n" % exepath)
+				continue 
+            
+			if  match and matchexe:
+
 				isdeleted = re.search(r'\(deleted\)' , match.group(2))
 				
 				if not isdeleted:
-					
+                    
 					if os.path.exists(redhat) : 
 						command = 'rpm -Vf "'+match.group(2)+'"' 
 					
@@ -223,8 +248,8 @@ for processPid in os.listdir("/proc"):
 						outputrpm = processrpm.communicate()[0]
 					
 						if outputrpm :
-						
-							thisfile = re.search(match.group(2) , outputrpm)
+
+							thisfile = re.search(match.group(2), outputrpm.decode('utf-8'))
 						
 							if thisfile:
 								print(Back.RESET + Fore.RED + "Suspicious lib or process %s in PID %s" % (match.group(2), processPid))
@@ -303,6 +328,34 @@ for processPid in os.listdir("/proc"):
 								exepath = os.path.realpath(exefile)
 								print(Fore.RED +  "Exefile %s\n" % exepath)
 								
+
+print(Back.RESET + Fore.YELLOW + "[*Searching process with name spoofed*]\n")
+				
+for processPid in os.listdir("/proc"):
+	
+	comm = '/proc/'+processPid+'/comm'
+	
+	if os.path.exists(comm) : 
+		
+		file = open(comm, "r")
+		
+		commbin = file.read().replace('\n', '')
+		
+		exefile = '/proc/'+processPid+'/exe'
+		try:
+			exepath = os.path.realpath(exefile)
+		
+		except:
+			pass
+			
+		else:
+			
+			exetest = os.path.basename(exepath)
+			
+			if commbin !=  exetest[0:15] :
+				
+				print(Back.RESET + Fore.RED + "Process name [%s]  it's not equal than exe name [%s] PID: %s \n" % (commbin, exepath, processPid) )
+
 										
 print(Back.RESET + Fore.YELLOW + "[*Searching CRON entries*]\n")
 
@@ -314,31 +367,29 @@ cronspooldebian = "/var/spool/cron/crontabs/"
 
 if os.path.exists(anacron) : 
 
-	OpenAndPrint(anacron)
-
-	print(Back.RESET + Fore.CYAN + "\tTesting %s integrity" % anacron)
+	if args.allinfo :
+		OpenAndPrint(anacron)
 	
 	TestIntegrity(anacron)
 	
-
-OpenAndPrint(crontab)
+if args.allinfo :
+	OpenAndPrint(crontab)
 	
-print(Back.RESET + Fore.CYAN + "\tTesting %s integrity" % crontab)
 
 TestIntegrity(crontab)
 
 
 if os.path.exists(crondir) :  
 	
-	WalkAndTest(crondir, True)
+	WalkAndTest(crondir, True, args.allinfo)
 
 if os.path.exists(cronspool) :  
 	
-	WalkAndTest(cronspool)
+	WalkAndTest(cronspool, False, True)
 			
 if os.path.exists(cronspooldebian) :  
 	
-	WalkAndTest(cronspooldebian)
+	WalkAndTest(cronspooldebian, False, True)
 	
 print(Back.RESET + Fore.YELLOW + "[*Searching RC files*]\n")
 
@@ -349,33 +400,30 @@ profiledir = "/etc/profile.d/"
 skeldir ="/etc/skel/"
 homedir = "/home/"
 
-OpenAndPrint(profile)
+if args.allinfo :
+	OpenAndPrint(profile)
 	
-print(Back.RESET + Fore.CYAN + "\tTesting %s integrity" % profile)
-
 TestIntegrity(profile)
 
 if os.path.exists(redhat) :
 
-	OpenAndPrint(bashrc)
-
-	print(Back.RESET + Fore.CYAN + "\tTesting %s integrity" % bashrc)
+	if args.allinfo :
+		OpenAndPrint(bashrc)
 
 	TestIntegrity(bashrc)
 
 else:
 	
-	OpenAndPrint(bashrcdebian)
-
-	print(Back.RESET + Fore.CYAN + "\tTesting %s integrity" % bashrcdebian)
+	if args.allinfo :
+		OpenAndPrint(bashrcdebian)
 
 	TestIntegrity(bashrcdebian)
 
-WalkAndTest(profiledir, True)
+WalkAndTest(profiledir, True, args.allinfo)
 
-WalkAndTest(skeldir, True)			
+WalkAndTest(skeldir, True, args.allinfo)			
 
-print(Back.RESET + Fore.YELLOW + "\tTesting if /home's rc files are equal than skel dir")
+print(Back.RESET + Fore.YELLOW + "\tTesting if /home's rc files are equal than skel dir\n")
 
 listOfFile = os.listdir("/home/")
 allFiles = list()
@@ -423,7 +471,7 @@ for entry in listOfFile:
 		
 		if os.path.isdir(xstartup):
 			
-			WalkAndTest(xstartup)
+			WalkAndTest(xstartup, False, True)
 			
 if os.path.isfile("/root/.xinitrc/"):
 			
@@ -431,7 +479,7 @@ if os.path.isfile("/root/.xinitrc/"):
 		
 if os.path.isdir("/root/.config/autostart/"):
 			
-	WalkAndTest("/root/.config/autostart/")
+	WalkAndTest("/root/.config/autostart/", False, True)
 			
 			
 print(Back.RESET + Fore.YELLOW + "[*Listing active Systemd Units*]\n")			
@@ -445,19 +493,19 @@ systemdgrap2 = "/etc/systemd/system/graphical.target.wants/"
 systemdlogoffRH = "/usr/lib/systemd/system-shutdown/"
 systemdlogoffDeb = "/lib/systemd/system-shutdown/"
 
-WalkAndTest(systemdmulti, True)
-WalkAndTest(systemdmulti2, True)
+WalkAndTest(systemdmulti, True, args.allinfo)
+WalkAndTest(systemdmulti2, True, args.allinfo)
 
-WalkAndTest(systemdgrap, True)
-WalkAndTest(systemdgrap2, True)
+WalkAndTest(systemdgrap, True, args.allinfo)
+WalkAndTest(systemdgrap2, True, args.allinfo)
 
 if os.path.exists(debian) :
 	
-	WalkAndTest(systemdlogoffDeb, True)
+	WalkAndTest(systemdlogoffDeb, True, args.allinfo)
 	
 else :
 	
-	WalkAndTest(systemdlogoffRH, True)			
+	WalkAndTest(systemdlogoffRH, True, args.allinfo)			
 			
 
 listOfFile = os.listdir("/home/")
@@ -471,11 +519,11 @@ for entry in listOfFile:
 		
 		if os.path.isdir(usersystemd):
 			
-			WalkAndTest(usersystemd)
+			WalkAndTest(usersystemd, False, True)
 
 if os.path.isdir("/root/.config/systemd/user/"):	
 				 
-	WalkAndTest("/root/.config/systemd/user/")
+	WalkAndTest("/root/.config/systemd/user/", False, True)
 			
 print(Back.RESET + Fore.YELLOW + "[*Listing Systemd Timer Units*]\n")		
 
@@ -492,7 +540,9 @@ if os.path.isdir(timerdir):
 		
 			servicech = timerdir+servicech
 		
-			OpenAndPrint(servicech)
+			if args.allinfo :
+				OpenAndPrint(servicech)
+			
 			TestIntegrity(servicech)			
 
 if os.path.isdir(timerdir2):
@@ -505,10 +555,49 @@ if os.path.isdir(timerdir2):
 		
 			servicech = timerdir2+servicech
 		
-			OpenAndPrint(servicech)
+			if args.allinfo :
+				OpenAndPrint(servicech)
+			
 			TestIntegrity(servicech)			
 
 
+print(Back.RESET + Fore.YELLOW + "[*Searching tmpfiles.d*]\n")
+
+etctmpfile = "/etc/tmpfiles.d/"
+runtmpfile = "/run/tmpfiles.d/"
+usertmpfile = "/usr/lib/tmpfiles.d/"
+
+WalkAndTest(etctmpfile, True, args.allinfo)
+WalkAndTest(runtmpfile, True, args.allinfo)
+WalkAndTest(usertmpfile, True, args.allinfo)
+
+listOfFile = os.listdir("/home/")
+allFiles = list()
+
+for entry in listOfFile:
+	fullPath = os.path.join("/home/", entry)
+	if os.path.isdir(fullPath):
+		
+		usertmpfiles = fullPath+"/.config/user-tmpfiles.d/"
+		usertmpfiles2 = fullPath+"/.local/share/user-tmpfiles.d/"
+		
+		if os.path.isdir(usertmpfiles):
+			
+			WalkAndTest(usertmpfiles, False, True)
+			
+		if os.path.isdir(usertmpfiles2):
+			
+			WalkAndTest(usertmpfiles2, False, True)
+			
+	
+print(Back.RESET + Fore.YELLOW + "[*Searching linger users*]\n")
+
+lingerpath= "/var/lib/systemd/linger"
+
+if os.path.exists(lingerpath):
+    
+	lingerusers = next(walk(lingerpath), (None, None, []))[2]
+	print(Back.RESET + Fore.RED + "Linger users: %s\n" % lingerusers)    
 
 
 
