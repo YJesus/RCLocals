@@ -30,14 +30,16 @@ def TestIntegrity(File):
 					
 		processrpm = subprocess.Popen([command], stdout=subprocess.PIPE,shell=True)
 		outputrpm = processrpm.communicate()[0]
+        
+		thisfile = re.search(File, outputrpm.decode('utf-8'))
 					
-		if outputrpm :
+		if thisfile :
 			
 			print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % File)			
 			print(Back.RESET + Fore.RED + "Integrity compromised\n")
 								
 		
-		if not outputrpm and args.allinfo:
+		if not thisfile and args.allinfo:
 			
 			print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % File)
 			print(Back.RESET + Fore.GREEN + "Integrity OK\n")
@@ -73,7 +75,7 @@ def TestIntegrity(File):
 				return(0)
 								
 				
-		packagename = outputdpkg.split(":")
+		packagename = outputdpkg.decode().split(":")
 						
 		commandDEBSUM = 'dpkg --verify "'+packagename[0]+'"'
 						
@@ -81,7 +83,7 @@ def TestIntegrity(File):
 		processdebsum = subprocess.Popen([commandDEBSUM], stdout=subprocess.PIPE,shell=True)
 		outputdebsum = processdebsum.communicate()[0]
 		
-		print (outputdebsum)
+		#print (outputdebsum)
 						
 		if outputdebsum :
 			
@@ -152,19 +154,17 @@ print(Back.RESET + Fore.YELLOW + "[*Listing GPG keys*]\n")
 if os.path.exists(debian) :
 	commandDEBKEY = 'apt-key list'
 							
-	processdebkey = subprocess.Popen([commandDEBKEY], stdout=subprocess.PIPE,shell=True)
-	outputdebkey = processdebkey.communicate()[0]
-	
-	print(Back.RESET + Fore.GREEN + "%s" % outputdebkey)
+	outputdebkey = subprocess.check_output(commandDEBKEY, shell=True)
+    
+	print(Back.RESET + Fore.GREEN + "%s" % outputdebkey.decode())
 	
 else:
 	
 	commandRPMKEY = 'rpm -q --queryformat "%{SUMMARY}\n" $(rpm -q gpg-pubkey)'
 							
-	processrpmkey = subprocess.Popen([commandRPMKEY], stdout=subprocess.PIPE,shell=True)
-	outputrpmkey = processrpmkey.communicate()[0]
+	outputrpmkey = subprocess.check_output(commandRPMKEY, shell=True)
 	
-	print(Back.RESET + Fore.GREEN + "%s" % outputrpmkey)
+	print(Back.RESET + Fore.GREEN + "%s" % outputrpmkey.decode())
 	
 
 print(Back.RESET + Fore.YELLOW + "[*Installed Packages*]\n")
@@ -172,19 +172,17 @@ print(Back.RESET + Fore.YELLOW + "[*Installed Packages*]\n")
 if os.path.exists(debian) :
 	commandDEBPACK= "dpkg-query -W -f=\'${binary:Package} ${Version}\\t${Maintainer}\\n\'"
 							
-	processdebpack = subprocess.Popen([commandDEBPACK], stdout=subprocess.PIPE,shell=True)
-	outputdebpack = processdebpack.communicate()[0]
+	outputdebpack= subprocess.check_output(commandDEBPACK, shell=True)
 	
-	print(Back.RESET + Fore.GREEN + "%s" % outputdebpack)
+	print(Back.RESET + Fore.GREEN + "%s" % outputdebpack.decode())
 	
 else:
 	
 	commandRPMPACK = r'rpm -qa --qf "%{INSTALLTIME:date} %{name}-%{version}-%{release}.%{arch} %|DSAHEADER?{%{DSAHEADER:pgpsig}}:{%|RSAHEADER?{%{RSAHEADER:pgpsig}}:{%|SIGGPG?{%{SIGGPG:pgpsig}}:{%|SIGPGP?{%{SIGPGP:pgpsig}}:{(none)}|}|}|}|\n"'
-									
-	processrpmpack = subprocess.Popen([commandRPMPACK], stdout=subprocess.PIPE,shell=True)
-	outputrpmpack = processrpmpack.communicate()[0]
-	
-	print(Back.RESET + Fore.GREEN + "%s" % outputrpmpack)
+
+	outputrpmpack= subprocess.check_output(commandRPMPACK, shell=True)
+    
+	print(Back.RESET + Fore.GREEN + "%s" % outputrpmpack.decode())
 
 
 print(Back.RESET + Fore.YELLOW + "[*Checking file integrity*]\n")
@@ -196,7 +194,7 @@ if os.path.exists(debian) :
 	processdebfile = subprocess.Popen([commandDEBFILE], stdout=subprocess.PIPE,shell=True)
 	outputdebfile = processdebfile.communicate()[0]
 	
-	print(Back.RESET + Fore.RED + "%s" % outputdebfile)
+	print(Back.RESET + Fore.RED + "%s" % outputdebfile.decode())
 	
 else:
 	
@@ -205,7 +203,7 @@ else:
 	processrpmfile = subprocess.Popen([commandRPMFILE], stdout=subprocess.PIPE,shell=True)
 	outputrpmfile = processrpmfile.communicate()[0]
 	
-	print(Back.RESET + Fore.RED + "%s" % outputrpmfile)
+	print(Back.RESET + Fore.RED + "%s" % outputrpmfile.decode())
 
 print(Back.RESET + Fore.YELLOW + "[*Checking process integrity*]\n")
 
@@ -293,7 +291,7 @@ for processPid in os.listdir("/proc"):
 						
 							else:
 								
-								packagename = outputdpkg.split(":")
+								packagename = outputdpkg.decode().split(":")
 						
 								commandDEBSUM = 'dpkg --verify "'+packagename[0]+'"'
 						
@@ -312,7 +310,7 @@ for processPid in os.listdir("/proc"):
 							
 						elif processdpkg.returncode == 0: 	
 								
-							packagename = outputdpkg.split(":")
+							packagename = outputdpkg.decode().split(":")
 						
 							commandDEBSUM = 'dpkg --verify "'+packagename[0]+'"'
 						
