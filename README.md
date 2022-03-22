@@ -26,6 +26,14 @@ Inspired by 'Autoruns' from Sysinternals, RCLocals analyzes all Linux startup po
 
 ·**linger users**
 
+·**Hashing binaries and libs + searching in CYMRU malware hash registry https://team-cymru.com/community-services/mhr/** 
+
+## REQUIREMENTS 
+
+Debian/Ubuntu and derivatives: install debsums # apt-get install debsums
+
+All platforms: pay attention to non default Python modules (colorama and DNS) 
+
 ## USAGE
 
 For only suspicious information:
