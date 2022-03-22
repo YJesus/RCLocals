@@ -9,6 +9,8 @@ import filecmp
 import re
 import argparse
 from os import walk
+import hashlib
+import DNS
 
 
 
@@ -84,13 +86,15 @@ def TestIntegrity(File):
 		outputdebsum = processdebsum.communicate()[0]
 		
 		#print (outputdebsum)
-						
-		if outputdebsum :
+        
+		thisfile = re.search(File, outputdebsum.decode('utf-8'))
+
+		if thisfile :
 			
 			print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % File)
 			print(Back.RESET + Fore.RED + "Integrity compromised\n")
 						
-		if not outputdebsum and args.allinfo:
+		if not thisfile and args.allinfo:
 			
 			print(Back.RESET + Fore.CYAN + "\tTesting %s integrity\n" % File)
 			print(Back.RESET + Fore.GREEN + "Integrity OK\n")
@@ -145,7 +149,7 @@ def CompareRC(File, DestFile):
 		
 	
 
-print(Back.RESET + Fore.GREEN + "RcLocals 2.0")
+print(Back.RESET + Fore.GREEN + "RcLocals 3.0")
 print(Back.RESET + Fore.GREEN + "https://github.com/YJesus/RCLocals\n")
 		
 
@@ -298,8 +302,10 @@ for processPid in os.listdir("/proc"):
 							
 								processdebsum = subprocess.Popen([commandDEBSUM], stdout=subprocess.PIPE,shell=True)
 								outputdebsum = processdebsum.communicate()[0]
+                                
+								thisfile = re.search(match.group(2), outputdebsum.decode('utf-8'))
 						
-								if outputdebsum :
+								if thisfile:
 						
 									print(Back.RESET + Fore.RED + "Suspicious lib or process %s in PID %s" % (match.group(2), processPid))
 										
@@ -491,6 +497,10 @@ systemdgrap2 = "/etc/systemd/system/graphical.target.wants/"
 systemdlogoffRH = "/usr/lib/systemd/system-shutdown/"
 systemdlogoffDeb = "/lib/systemd/system-shutdown/"
 
+## Generators
+
+systemdgenerators = ["/etc/systemd/system-generators/", "/usr/local/lib/systemd/system-generators/", "/lib/systemd/system-generators/", "/etc/systemd/user-generators/", "/usr/local/lib/systemd/user-generators/", "/usr/lib/systemd/user-generators/"]
+
 WalkAndTest(systemdmulti, True, args.allinfo)
 WalkAndTest(systemdmulti2, True, args.allinfo)
 
@@ -505,6 +515,13 @@ else :
 	
 	WalkAndTest(systemdlogoffRH, True, args.allinfo)			
 			
+
+for sysdgenerators in systemdgenerators:
+    
+    if os.path.exists(sysdgenerators) :
+        
+        WalkAndTest(sysdgenerators, True, False)
+
 
 listOfFile = os.listdir("/home/")
 allFiles = list()
@@ -598,8 +615,57 @@ if os.path.exists(lingerpath):
 	print(Back.RESET + Fore.RED + "Linger users: %s\n" % lingerusers)    
 
 
+print(Back.RESET + Fore.YELLOW + "[*Hashing process and libs + malware detection*]\n")
 
+binandhash = {}
 
+for processPid in os.listdir("/proc"):
+    
+    maps = '/proc/'+processPid+'/maps'
+    
+    if os.path.exists(maps) : 
+        
+        file = open(maps, "r")
 
+        for libs in file.readlines():
+            
+            match = re.search(r'.*\d\s(.{4})\s\d.*\s*\s(\/.*)' , libs)
+            
+            if match:
+                
+                matchexe = re.search(r'.*x.*', match.group(1))
+                
+            if  match and matchexe:
 
+                isdeleted = re.search(r'\(deleted\)' , match.group(2))
+                
+                if not isdeleted:
+                    
+                    try:
+                    
+                        with open(match.group(2),"rb") as f:
+                            bytes = f.read() # read entire file as bytes
+                            binhash = hashlib.sha256(bytes).hexdigest();
+                        
+                            binandhash[match.group(2)] = binhash
+                    except:
+                        pass
+                        
 
+for el in binandhash :
+    
+    cymrures = ""
+    
+    try :
+
+        cymrures =DNS.dnslookup(f"{value[0:32]}.{value[32:64]}.hash.cymru.com", "TXT")
+    
+    except:
+    
+        pass
+    
+    if cymrures:
+        
+        print(Back.RESET + Fore.RED + f"{el} --> {binandhash[el]} [MALWARE DETECTED]")
+    else:
+        print(Back.RESET + Fore.GREEN + f"{el} --> {binandhash[el]}")
