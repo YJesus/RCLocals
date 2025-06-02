@@ -26,6 +26,8 @@ Inspired by 'Autoruns' from Sysinternals, RCLocals analyzes all Linux startup po
 
 ·**linger users**
 
+**Rogue namespaces**
+
 ·**Hashing binaries and libs + searching in CYMRU malware hash registry https://team-cymru.com/community-services/mhr/** 
 
 ## REQUIREMENTS 
